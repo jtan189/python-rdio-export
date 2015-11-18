@@ -27,15 +27,13 @@ def uprint(msg, newline=True, quiet=False):
         sys.stdout.flush()
 
 def print_csv(exporter, user):
-    fieldnames = ['artist', 'album', 'url',]
-    writer = csv.DictWriter(raw_stdout, fieldnames=fieldnames)
+    fieldnames = ['artist', 'album', 'track',]
+    writer = csv.DictWriter(raw_stdout, fieldnames=fieldnames, 
+                            quoting=csv.QUOTE_MINIMAL)
     writer.writeheader()
     for t in exporter.collection(user):
-        row = {}
-        row['artist'] = t.get('artist').encode('utf-8')
-        row['album'] = t.get('name').encode('utf-8')
-        row['url'] = t.get('shortUrl')
-        writer.writerow(row)
+        t['track'] = t.pop('name') # rename 'name' key to 'track'
+        writer.writerow({key:t[key].encode('utf-8') for key in fieldnames})
 
 def print_md(exporter, user):
     # Iterate over the user's collection, grouped by artist
@@ -60,7 +58,7 @@ def print_md(exporter, user):
             # Update the last album
             last_album = album
 
-        uprint('  - %s' % t.get('name'))
+        uprint('- %s' % t.get('name'))
 
 def get_user(exporter, email, username):
     if email:
@@ -97,6 +95,8 @@ def main():
             help='suppress all output except errors')
     parser.add_argument('--version', action='version',
             version='%(prog)s {v}'.format(v=__version__))
+    parser.add_argument('--playlists', action='store_true',
+            help='export playlists, instead of collection')
 
     # Get our arguments
     args = parser.parse_args()
@@ -137,12 +137,22 @@ def main():
     exporter = RdioExporter(client_id=rdio_client_id, client_secret=rdio_client_secret)
 
     user = get_user(exporter, args.email, args.username)
-    uprint('Fetching collection for %s' % user.get('username'))
+    # uprint('Fetching collection for %s' % user.get('username'))
 
-    if args.format == 'csv':
-        print_csv(exporter, user)
+    if args.playlists:
+        playlists = exporter.get_playlists(user)
+        print_playlists(playlists)
     else:
-        print_md(exporter, user)
+        if args.format == 'csv':
+            print_csv(exporter, user)
+        else:
+            print_md(exporter, user)
+
+def print_playlists(playlists):
+    for p_name in playlists.keys():
+        uprint("\n## %s" % p_name)
+        for track_num, track_info in enumerate(playlists[p_name]):
+            uprint('%s %s' % (str((track_num+1))+".", ' - '.join(track_info)))
 
 if __name__ == '__main__':
     try:

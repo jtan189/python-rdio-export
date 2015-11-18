@@ -15,6 +15,7 @@ RDIO_C_EXTRAS = ','.join((
         'artist',
         'displayDate',
         'shortUrl',
+        'album',
         'albumKey',
         'artistKey',
 ))
@@ -84,7 +85,7 @@ class RdioExporter():
         # Continue fetching in batches until the last response is smaller
         # than the page size (count).
         while (resp_size == count):
-            collection = self._call('collection', 'getAlbumsInCollection',
+            collection = self._call('collection', 'getTracksInCollection',
                     user=user.get('key'), sort=sort, start=start, count=count, extras=extras)
 
             # Update the size of the last response
@@ -96,3 +97,18 @@ class RdioExporter():
             # Yield the track results
             for t in collection:
                 yield t
+
+    def get_playlists(self, user):
+        playlist_info = self._call('playlists', 'getPlaylists',
+                    user=user.get('key'))
+        playlists = dict()
+        for p_type in playlist_info:
+            if playlist_info[p_type]:
+                for p in playlist_info[p_type]:
+                    p_key = p['key']
+                    p_name = p['name']
+                    playlist = self._call('core', 'get', keys=p_key, extras='tracks')
+                    playlists[p_name] = []
+                    for t in playlist[p_key]['tracks']:
+                        playlists[p_name].append([t['artist'], t['album'], t['name']])
+        return playlists
